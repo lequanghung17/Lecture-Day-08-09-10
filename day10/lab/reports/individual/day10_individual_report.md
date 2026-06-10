@@ -1,6 +1,6 @@
 # Báo Cáo Cá Nhân - Lab Day 10: Data Pipeline & Observability
 
-**Họ và tên:** Người thực hiện  
+**Họ và tên:** Lê Quang Hưng
 **Vai trò:** Cleaning / Quality Owner  
 **Ngày nộp:** 2026-06-10  
 **Run tham chiếu:** `2026-06-10T08-20Z`

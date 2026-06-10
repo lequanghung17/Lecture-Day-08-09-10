@@ -294,9 +294,9 @@ Freshness / version → Volume & errors → Schema & contract → Lineage / run_
 
 ---
 
-## Nhật ký thực hiện hôm nay - Day 10
+##  - Day 10
 
-> Mục này ghi lại phần đã làm trong lab để dễ review, demo và nộp bài.
+> Lab day10
 
 ### 1. Mục tiêu đã hoàn thành
 
@@ -416,5 +416,5 @@ Freshness / version → Volume & errors → Schema & contract → Lineage / run_
 - Before/after rõ nhất: `q_refund_window`.
   - Inject bad: `hits_forbidden=yes`.
   - After fix: `hits_forbidden=no`.
-- Freshness vẫn `FAIL` vì dữ liệu mẫu có `latest_exported_at=2026-04-11T00:00:00`, cũ hơn SLA 24 giờ so với ngày chạy. Đây là observability signal hợp lệ, không phải lỗi pipeline.
-- Trước khi nộp, thay tên/email thật trong `reports/group_report.md` và `reports/individual/day10_individual_report.md`.
+- Freshness vẫn `FAIL` vì dữ liệu mẫu có `latest_exported_at=2026-04-11T00:00:00`, cũ hơn SLA 24 giờ so với ngày chạy.
+-

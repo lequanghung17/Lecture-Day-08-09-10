@@ -121,4 +121,3 @@ Day 09 retrieval worker chỉ trả lời đúng nếu corpus sạch. Pipeline D
 - Freshness vẫn FAIL vì source sample cũ; chưa cập nhật timestamp nguồn.
 - Chưa dùng Great Expectations/pydantic thật, mới dùng custom expectation suite.
 - Eval mở rộng có `q_p1_update_frequency` top1 chưa đúng doc dù top-k có expected answer.
-- Tên nhóm/thành viên đang dùng nhãn chung; cần thay bằng thông tin thật trước khi nộp.
