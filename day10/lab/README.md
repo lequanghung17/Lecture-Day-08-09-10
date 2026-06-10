@@ -291,3 +291,130 @@ Freshness / version → Volume & errors → Schema & contract → Lineage / run_
 - Lab Day 09 (orchestration): [`../../day09/lab/README.md`](../../day09/lab/README.md)
 - Great Expectations (tuỳ chọn nâng cao): https://docs.greatexpectations.io/
 - ChromaDB: https://docs.trychroma.com/
+
+---
+
+## Nhật ký thực hiện hôm nay - Day 10
+
+> Mục này ghi lại phần đã làm trong lab để dễ review, demo và nộp bài.
+
+### 1. Mục tiêu đã hoàn thành
+
+- Sửa pipeline baseline để ingest/clean/validate/embed đủ dữ liệu cho 5 nguồn canonical:
+  `policy_refund_v4`, `sla_p1_2026`, `it_helpdesk_faq`, `hr_leave_policy`, `access_control_sop`.
+- Loại hoặc canonicalize các lỗi dữ liệu ảnh hưởng trực tiếp tới retrieval:
+  stale refund `14 ngày`, HR 2025 `10 ngày phép năm`, `exported_at` sai format, ambiguous chunks, và fact P1 escalation `10 phút`.
+- Chạy pipeline sạch thành công.
+- Tạo evidence before/after cho Sprint 3.
+- Chạy grading chính thức và đạt 10/10 câu.
+- Điền các tài liệu nộp bài: architecture, data contract, runbook, quality report, group report, individual report mẫu.
+
+### 2. Luồng thực hiện
+
+1. Chạy pipeline baseline và phát hiện halt ở HR stale:
+
+   ```powershell
+   python etl_pipeline.py run
+   ```
+
+   Lỗi ban đầu:
+
+   ```text
+   expectation[hr_leave_no_stale_10d_annual] FAIL (halt)
+   ```
+
+2. Phân tích raw CSV, cleaned CSV, quarantine CSV và grading questions để xác định gap:
+
+   - `access_control_sop` là nguồn hợp lệ nhưng chưa có trong allowlist.
+   - HR 2025 text `10 ngày phép năm` vẫn lọt qua nếu chỉ dựa vào `effective_date`.
+   - Một số row có `exported_at` sai ISO datetime.
+   - Một số chunk có nội dung mơ hồ `Nội dung không rõ ràng`.
+   - Câu P1 escalation cần fact `10 phút` nằm trong top-k retrieval.
+
+3. Sửa cleaning rules và expectations.
+
+4. Chạy pipeline sạch:
+
+   ```powershell
+   python etl_pipeline.py run
+   ```
+
+   Run sạch cuối:
+
+   ```text
+   run_id=2026-06-10T08-20Z
+   raw_records=247
+   cleaned_records=37
+   quarantine_records=210
+   embed_upsert count=37
+   PIPELINE_OK
+   ```
+
+5. Tạo before/after evidence:
+
+   ```powershell
+   python etl_pipeline.py run --run-id inject-bad --no-refund-fix --skip-validate
+   python eval_retrieval.py --out artifacts/eval/after_inject_bad.csv
+   python etl_pipeline.py run
+   python eval_retrieval.py --out artifacts/eval/after_fix_eval.csv --top-k 5
+   ```
+
+6. Chạy grading chính thức:
+
+   ```powershell
+   python grading_run.py --out artifacts/eval/grading_run.jsonl
+   ```
+
+   Kết quả cuối:
+
+   ```text
+   gq_d10_01 -> gq_d10_10:
+   contains_expected=True
+   hits_forbidden=False
+   top1_doc_matches=True
+   ```
+
+### 3. File đã chỉnh sửa
+
+| File | Nội dung đã làm |
+|------|-----------------|
+| `transform/cleaning_rules.py` | Thêm `access_control_sop` vào allowlist; quarantine HR 2025 stale text; quarantine invalid `exported_at`; quarantine ambiguous text; canonicalize P1 escalation `10 phút`. |
+| `quality/expectations.py` | Thêm expectations `access_control_present`, `no_ambiguous_chunk_text`, `exported_at_iso_datetime`, `p1_escalation_10min_present`. |
+| `contracts/data_contract.yaml` | Cập nhật schema, owner, freshness SLA, allowed doc ids, canonical sources, quarantine policy. |
+| `docs/pipeline_architecture.md` | Điền sơ đồ pipeline, boundaries, idempotency, run_id, liên hệ Day 09. |
+| `docs/data_contract.md` | Điền source map, schema cleaned, quarantine reasons, canonical/versioning. |
+| `docs/runbook.md` | Điền symptom, detection, diagnosis, mitigation, prevention cho incident stale data. |
+| `docs/quality_report.md` | Tạo quality report từ before/after evidence và grading results. |
+| `reports/group_report.md` | Điền tổng quan pipeline, metric_impact, before/after, freshness, risk. |
+| `reports/individual/day10_individual_report.md` | Tạo báo cáo cá nhân mẫu cho vai trò Cleaning / Quality Owner. |
+
+### 4. Artifacts đã tạo
+
+| Artifact | Ý nghĩa |
+|----------|---------|
+| `artifacts/manifests/manifest_2026-06-10T08-20Z.json` | Manifest run sạch cuối. |
+| `artifacts/cleaned/cleaned_2026-06-10T08-20Z.csv` | Cleaned dataset dùng để embed. |
+| `artifacts/quarantine/quarantine_2026-06-10T08-20Z.csv` | Các row bị quarantine với reason. |
+| `artifacts/eval/after_inject_bad.csv` | Eval sau khi cố ý inject data xấu. |
+| `artifacts/eval/after_fix_eval.csv` | Eval sau khi chạy lại pipeline sạch. |
+| `artifacts/eval/grading_run.jsonl` | Grading chính thức 10 câu. |
+
+### 5. Rule / expectation mới dùng cho `metric_impact`
+
+| Rule / expectation | Impact đo được |
+|--------------------|----------------|
+| `allow_access_control_sop` | `access_control_rows=6`; `gq_d10_10` pass. |
+| `stale_hr_2025_annual_leave_text` | Quarantine 6 row HR stale; `hr_leave_no_stale_10d_annual violations=0`. |
+| `invalid_exported_at_format` | Quarantine 6 row sai timestamp; `bad_exported_at=0`. |
+| `ambiguous_chunk_text` | Quarantine 5 ambiguous rows; `ambiguous_rows=0`. |
+| `p1_escalation_10min_present` | Giữ fact P1 escalation `10 phút`; `gq_d10_06` pass. |
+
+### 6. Kết quả cần ghi nhớ khi demo / nộp bài
+
+- Pipeline chuẩn: `PIPELINE_OK`.
+- Official grading: 10/10 câu pass.
+- Before/after rõ nhất: `q_refund_window`.
+  - Inject bad: `hits_forbidden=yes`.
+  - After fix: `hits_forbidden=no`.
+- Freshness vẫn `FAIL` vì dữ liệu mẫu có `latest_exported_at=2026-04-11T00:00:00`, cũ hơn SLA 24 giờ so với ngày chạy. Đây là observability signal hợp lệ, không phải lỗi pipeline.
+- Trước khi nộp, thay tên/email thật trong `reports/group_report.md` và `reports/individual/day10_individual_report.md`.

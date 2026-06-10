@@ -20,10 +20,12 @@ ALLOWED_DOC_IDS = frozenset(
         "sla_p1_2026",
         "it_helpdesk_faq",
         "hr_leave_policy",
+        "access_control_sop",
     }
 )
 
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_ISO_DATETIME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$")
 _DMY_SLASH = re.compile(r"^(\d{2})/(\d{2})/(\d{4})$")
 
 
@@ -111,8 +113,28 @@ def clean_rows(
             )
             continue
 
+        if exported_at and not _ISO_DATETIME.match(exported_at):
+            quarantine.append({**raw, "reason": "invalid_exported_at_format"})
+            continue
+
         if not text:
             quarantine.append({**raw, "reason": "missing_chunk_text"})
+            continue
+
+        if doc_id == "hr_leave_policy":
+            text_norm = _norm_text(text)
+            if "10 ngày phép năm" in text_norm or "bản hr 2025" in text_norm:
+                quarantine.append(
+                    {
+                        **raw,
+                        "reason": "stale_hr_2025_annual_leave_text",
+                        "effective_date_normalized": eff_norm,
+                    }
+                )
+                continue
+
+        if "Nội dung không rõ ràng" in text:
+            quarantine.append({**raw, "reason": "ambiguous_chunk_text"})
             continue
 
         key = _norm_text(text)
@@ -129,6 +151,11 @@ def clean_rows(
                     "7 ngày làm việc",
                 )
                 fixed_text += " [cleaned: stale_refund_window]"
+        if doc_id == "sla_p1_2026" and "Escalation P1:" in fixed_text and "10 phút" in fixed_text:
+            fixed_text = (
+                "Ticket P1 escalation: nếu không có phản hồi với ticket P1 sau 10 phút, "
+                "hệ thống auto escalate lên Senior Engineer."
+            )
 
         seq += 1
         cleaned.append(

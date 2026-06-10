@@ -1,19 +1,23 @@
-# Data contract — Lab Day 10 (tiếp nối artifact CS + IT Helpdesk)
-# Sinh viên bổ sung owner, SLA freshness, và nguồn canonical.
+# Data contract - Lab Day 10
 
-version: "1.0"
+version: "1.1"
 dataset: "kb_chunk_export"
-owner_team: "__TODO__"
+owner_team: "Day10 Lab Team"
+
+description: >
+  Cleaned knowledge-base chunks for the CS + IT Helpdesk assistant. The pipeline
+  ingests raw policy exports, quarantines invalid/stale rows, validates cleaned
+  rows, and publishes embeddings to the day10_kb Chroma collection.
 
 schema_cleaned:
   chunk_id:
     type: string
     required: true
-    description: "ID ổn định sau clean (thường hash hoặc doc_id + seq)"
+    description: "Stable id generated from doc_id, cleaned chunk_text, and sequence."
   doc_id:
     type: string
     required: true
-    description: "Khóa logic tài liệu nguồn (vd policy_refund_v4)"
+    description: "Canonical source document id."
   chunk_text:
     type: string
     required: true
@@ -22,39 +26,76 @@ schema_cleaned:
   effective_date:
     type: date
     required: true
+    format: "YYYY-MM-DD"
   exported_at:
     type: datetime
     required: true
+    format: "YYYY-MM-DDTHH:MM:SS"
 
 quality_rules:
   - id: "no_duplicate_chunk_text"
     severity: "warn"
+    description: "Duplicate chunk text is quarantined to avoid repeated vectors."
   - id: "no_stale_refund_window"
-    description: "Không được để chunk policy refund chứa cửa sổ 14 ngày (lệch so với v4 = 7 ngày)"
     severity: "halt"
+    description: "Refund policy must not expose stale 14-day windows; current v4 is 7 working days."
+  - id: "no_stale_hr_2025_annual_leave"
+    severity: "halt"
+    description: "HR 2025 annual leave text for under-3-year employees is quarantined; current 2026 policy is 12 days."
+  - id: "access_control_present"
+    severity: "halt"
+    description: "access_control_sop must be present because grading includes Level 4 Admin Access."
+  - id: "exported_at_iso_datetime"
+    severity: "halt"
+    description: "Rows with non-ISO exported_at values are quarantined."
 
 freshness:
-  measured_at: "publish"  # ingest | cleaned | publish
+  measured_at: "publish"
   sla_hours: 24
-  alert_channel: "__TODO__"
+  alert_channel: "#data-observability"
+  latest_result:
+    run_id: "2026-06-10T08-20Z"
+    status: "FAIL"
+    reason: "Sample exported_at is 2026-04-11T00:00:00, older than the 24h lab SLA."
 
 canonical_sources:
   - path: "data/docs/policy_refund_v4.txt"
     doc_id: "policy_refund_v4"
+    owner: "CS Operations"
   - path: "data/docs/sla_p1_2026.txt"
     doc_id: "sla_p1_2026"
+    owner: "IT Support"
   - path: "data/docs/it_helpdesk_faq.txt"
     doc_id: "it_helpdesk_faq"
+    owner: "IT Helpdesk"
   - path: "data/docs/hr_leave_policy.txt"
     doc_id: "hr_leave_policy"
+    owner: "HR"
+  - path: "data/docs/access_control_sop.txt"
+    doc_id: "access_control_sop"
+    owner: "Security / IT"
 
-# Baseline allowlist export — nhóm mở rộng doc mới phải đồng bộ cleaning_rules + contract.
 allowed_doc_ids:
   - policy_refund_v4
   - sla_p1_2026
   - it_helpdesk_faq
   - hr_leave_policy
+  - access_control_sop
 
-# Merit/Distinction: có thể đưa cutoff versioning vào env và tham chiếu ở đây (tránh hard-code trong code).
 policy_versioning:
   hr_leave_min_effective_date: "2026-01-01"
+  refund_current_window: "7 ngay lam viec"
+  p1_escalation_current_value: "10 phut"
+
+quarantine_policy:
+  destination: "artifacts/quarantine/quarantine_<run_id>.csv"
+  approval_to_restore: "Owner team plus pipeline maintainer"
+  reasons_tracked:
+    - unknown_doc_id
+    - duplicate_chunk_text
+    - stale_hr_policy_effective_date
+    - stale_hr_2025_annual_leave_text
+    - invalid_exported_at_format
+    - missing_effective_date
+    - missing_chunk_text
+    - ambiguous_chunk_text

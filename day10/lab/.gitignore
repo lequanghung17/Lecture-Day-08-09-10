@@ -1,6 +1,7 @@
 .env
-.venv/
+.venv*/
 venv/
+.uv-cache/
 __pycache__/
 *.pyc
 .DS_Store
@@ -9,3 +10,17 @@ chroma_db/
 *.log
 
 artifacts/*
+!artifacts/*/
+artifacts/*/*
+!artifacts/*/.gitkeep
+!artifacts/cleaned/cleaned_2026-06-10T08-20Z.csv
+!artifacts/cleaned/cleaned_inject-bad.csv
+!artifacts/eval/after_fix_eval.csv
+!artifacts/eval/after_inject_bad.csv
+!artifacts/eval/grading_run.jsonl
+!artifacts/logs/run_2026-06-10T08-20Z.log
+!artifacts/logs/run_inject-bad.log
+!artifacts/manifests/manifest_2026-06-10T08-20Z.json
+!artifacts/manifests/manifest_inject-bad.json
+!artifacts/quarantine/quarantine_2026-06-10T08-20Z.csv
+!artifacts/quarantine/quarantine_inject-bad.csv

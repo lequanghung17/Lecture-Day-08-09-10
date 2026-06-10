@@ -112,5 +112,70 @@ def run_expectations(cleaned_rows: List[Dict[str, Any]]) -> Tuple[List[Expectati
         )
     )
 
+    # E7: access control SOP must be present for grading questions about admin access.
+    access_rows = [r for r in cleaned_rows if r.get("doc_id") == "access_control_sop"]
+    ok7 = len(access_rows) >= 1
+    results.append(
+        ExpectationResult(
+            "access_control_present",
+            ok7,
+            "halt",
+            f"access_control_rows={len(access_rows)}",
+        )
+    )
+
+    # E8: ambiguous chunks are not reliable enough to embed.
+    ambiguous = [
+        r
+        for r in cleaned_rows
+        if "Nội dung không rõ ràng" in (r.get("chunk_text") or "")
+    ]
+    ok8 = len(ambiguous) == 0
+    results.append(
+        ExpectationResult(
+            "no_ambiguous_chunk_text",
+            ok8,
+            "halt",
+            f"ambiguous_rows={len(ambiguous)}",
+        )
+    )
+
+    # E9: exported_at should be a full ISO-like timestamp after cleaning.
+    exported_bad = [
+        r
+        for r in cleaned_rows
+        if not re.match(
+            r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$",
+            (r.get("exported_at") or "").strip(),
+        )
+    ]
+    ok9 = len(exported_bad) == 0
+    results.append(
+        ExpectationResult(
+            "exported_at_iso_datetime",
+            ok9,
+            "halt",
+            f"bad_exported_at={len(exported_bad)}",
+        )
+    )
+
+    # E10: P1 escalation fact must remain available for retrieval/grading.
+    p1_escalation = [
+        r
+        for r in cleaned_rows
+        if r.get("doc_id") == "sla_p1_2026"
+        and "10 phút" in (r.get("chunk_text") or "")
+        and "escalate" in (r.get("chunk_text") or "").lower()
+    ]
+    ok10 = len(p1_escalation) >= 1
+    results.append(
+        ExpectationResult(
+            "p1_escalation_10min_present",
+            ok10,
+            "halt",
+            f"p1_escalation_rows={len(p1_escalation)}",
+        )
+    )
+
     halt = any(not r.passed and r.severity == "halt" for r in results)
     return results, halt
